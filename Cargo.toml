@@ -1,0 +1,11 @@
+[package]
+name = "pinout"
+version = "0.1.0"
+authors = ["Zachary Kohnen <me@dusterthefirst.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.41"
+argh = "0.1.4"
+lexpr = "0.2.6"
+regex = "1.5.4"
