@@ -16,7 +16,7 @@ pub struct Arguments {
     pub output_file: PathBuf,
     /// language to generate constants in
     #[argh(option, long = "lang")]
-    pub language: Language,
+    pub language: Language, // TODO: auto guess?
 }
 
 #[derive(Debug, Display, EnumVariantNames)]
@@ -31,8 +31,8 @@ impl FromStr for Language {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str().trim() {
-            "c" => Language::C,
-            "cpp" | "cxx" | "c++" => Language::Cpp,
+            "c" | "h" => Language::C,
+            "cpp" | "cxx" | "c++" | "hpp" | "hxx" | "h++" => Language::Cpp,
             "rust" | "rs" => Language::Rust,
             _ => {
                 return Err(format!(

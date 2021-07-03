@@ -1,4 +1,5 @@
 use anyhow::Context;
+use args::Language;
 use netlist::Netlist;
 use regex::Regex;
 use std::fs;
@@ -33,11 +34,24 @@ fn main() -> anyhow::Result<()> {
         netlist.title, netlist.rev, netlist.company,
     );
 
-    println!(
+    eprintln!(
         "Generating {} file `{}`",
         args.language,
         args.output_file.to_string_lossy(),
     );
+
+    match args.language {
+        Language::C | Language::Cpp => {
+            eprintln!("Using C code generator");
+            
+            todo!("Create C generator")
+        }
+        Language::Rust => {
+            eprintln!("Using Rust code generator");
+
+            todo!("Create Rust generator")
+        }
+    }
 
     Ok(())
 }
