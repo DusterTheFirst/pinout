@@ -7,5 +7,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.41"
 argh = "0.1.4"
+dialoguer = "0.8.0"
 lexpr = "0.2.6"
 regex = "1.5.4"

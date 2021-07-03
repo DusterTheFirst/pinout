@@ -1,8 +1,16 @@
 use anyhow::Context;
+use dialoguer::MultiSelect;
 use lexpr::Value;
 use regex::Regex;
 use sexpr::Text;
-use std::{collections::HashMap, fs, hash::Hash, path::PathBuf};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    fs,
+    hash::Hash,
+    iter,
+    path::PathBuf,
+};
 
 use argh::FromArgs;
 
@@ -15,11 +23,12 @@ mod sexpr;
 struct Arguments {
     #[argh(positional)]
     pub netlist: PathBuf,
+    #[argh(positional)]
+    pub reference: Vec<String>,
 }
 
 fn main() -> anyhow::Result<()> {
     let args: Arguments = argh::from_env();
-    dbg!(&args);
 
     let sexpr = {
         let netlist_file =
@@ -41,51 +50,139 @@ fn main() -> anyhow::Result<()> {
         )
     };
 
+    println!("Parsing document {} {} by {}", title, rev, company);
+
     let nets = sexpr["nets"]
         .list_iter()
         .unwrap()
         .map(|net| {
-            let name = net["name"].text_join();
+            let net_name = Net::new(&net);
 
-            net.list_iter().unwrap().skip(2).map(move |node| {
-                let reference = node["ref"].text_join();
-                let pin = node["pin"].text_join();
-
-                ((reference, pin), name.clone())
-            })
+            net.list_iter()
+                .unwrap()
+                .skip(3)
+                .map(move |node| (Node::new(&node), net_name.clone()))
         })
         .flatten()
         .collect::<HashMap<_, _>>();
 
-    dbg!(nets);
+    // dbg!(nets);
 
     let pins = sexpr["libparts"]
         .list_iter()
         .unwrap()
-        .map(|v| {
-            v["pins"]
-                .list_iter()
-                .map(|pins| (LibraryPart::new(&v), pins.map(Pin::new).collect::<Vec<_>>()))
+        .map(|libpart| {
+            libpart["pins"].list_iter().map(|pins| {
+                let pins = pins.map(Pin::new).collect::<Cow<_>>();
+
+                LibraryPart::from_aliases(&libpart)
+                    .chain(iter::once(LibraryPart::new(&libpart)))
+                    .map(move |part| (part, pins.clone()))
+            })
         })
-        .filter_map(|a| a)
+        .filter_map(|x| x)
+        .flatten()
         .collect::<HashMap<_, _>>();
 
-    // dbg!(pins);
+    // dbg!(&pins);
 
     let components = sexpr["components"]
         .list_iter()
         .unwrap()
         .map(|v| {
             let component = Component::new(v);
-            let pins = pins.get(&component.libpart);
+
+            let pins = pins.get(&component.libpart).map(|pins| {
+                pins.iter()
+                    .map(|pin| {
+                        let node = Node {
+                            reference: component.reference.clone(),
+                            pin: pin.num.clone(),
+                        };
+
+                        (
+                            pin,
+                            nets.get(&node)
+                                .unwrap_or_else(|| panic!("no nets entry for {:?}", node)),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            });
 
             (v["ref"].text_join(), (component, pins))
         })
-        .collect::<HashMap<_, _>>();
+        .collect::<BTreeMap<_, _>>();
 
-    // dbg!(components);
+    // TODO: filter earlier?
+    let width = components.keys().map(|x| x.len()).max().unwrap_or(0);
+
+    let (references, items): (Vec<_>, Vec<_>) = components
+        .iter()
+        .map(|(reference, (component, _))| {
+            (
+                reference,
+                format!("{:>width$}: {}", reference, component.value, width = width),
+            )
+        })
+        .unzip();
+
+    let choices = MultiSelect::new()
+        .items(&items)
+        .interact()?
+        .into_iter()
+        .map(|i| {
+            let reference = references[i];
+
+            (reference, &components[reference].1)
+        })
+        .collect::<Vec<_>>();
+
+    for (reference, choice) in choices {
+        println!("{}: {:?}", reference, choice);
+    }
+    // let results = args
+    //     .reference
+    //     .into_iter()
+    //     .map(Cow::<str>::Owned)
+    //     .map(|reference| (reference.clone(), components.get(&reference)))
+    //     .collect::<HashMap<Cow<str>, _>>();
+
+    // println!("{:#?}", results);
 
     Ok(())
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct Node<'t> {
+    pub reference: Text<'t>,
+    pub pin: Text<'t>,
+}
+
+impl<'t> Node<'t> {
+    pub fn new(node: &'t Value) -> Self {
+        Node {
+            reference: node["ref"].text_join(),
+            pin: node["pin"].text_join(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Net<'t> {
+    Custom(Text<'t>),
+    Generated(Text<'t>),
+}
+
+impl<'t> Net<'t> {
+    pub fn new(net: &'t Value) -> Self {
+        let name = net["name"].text_join();
+
+        if name.starts_with("Net-(") {
+            Net::Generated(name)
+        } else {
+            Net::Custom(name)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +192,7 @@ pub struct Component<'t> {
     description: Text<'t>,
     footprint: Text<'t>,
     datasheet: Text<'t>,
+    reference: Text<'t>,
 }
 
 impl<'t> Component<'t> {
@@ -105,6 +203,7 @@ impl<'t> Component<'t> {
             value: value["value"].text_join(),
             footprint: value["footprint"].text_join(),
             datasheet: value["datasheet"].text_join(),
+            reference: value["ref"].text_join(),
         }
     }
 }
@@ -121,6 +220,19 @@ impl<'t> LibraryPart<'t> {
             lib: value["lib"].text_join(),
             part: value["part"].text_join(),
         }
+    }
+
+    pub fn from_aliases(value: &'t Value) -> impl Iterator<Item = LibraryPart<'t>> {
+        value["aliases"]
+            .list_iter()
+            .map(|iter| {
+                iter.map(move |alias| Self {
+                    lib: value["lib"].text_join(),
+                    part: alias[1].text_join(),
+                })
+            })
+            .into_iter()
+            .flatten()
     }
 }
 
