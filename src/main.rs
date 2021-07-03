@@ -12,6 +12,8 @@ mod sexpr;
 fn main() -> anyhow::Result<()> {
     let args: Arguments = argh::from_env();
 
+    dbg!(&args);
+
     let sexpr = {
         let netlist_file =
             fs::read_to_string(args.netlist).context("Failed to open the provided netlist file")?;
