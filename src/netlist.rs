@@ -1,26 +1,47 @@
-use std::{borrow::Cow, collections::HashMap, iter};
+use std::{borrow::Cow, collections::HashMap, iter, ops::Deref};
+use strum::Display;
 
 use lexpr::Value;
 
 use crate::sexpr::{IntoText, Text};
 
+#[derive(Debug)]
 pub struct Netlist<'t> {
+    pub sheet: Sheet<'t>,
+    pub components: HashMap<String, AssociatedComponent<'t>>,
+}
+
+#[derive(Debug)]
+pub struct AssociatedComponent<'t> {
+    component: Component<'t>,
+    pub pins: Vec<(Pin<'t>, Net<'t>)>,
+}
+
+impl<'t> Deref for AssociatedComponent<'t> {
+    type Target = Component<'t>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.component
+    }
+}
+
+#[derive(Debug)]
+pub struct Sheet<'t> {
     pub title: Text<'t>,
     pub company: Text<'t>,
     pub rev: Text<'t>,
-    pub components: HashMap<Text<'t>, (Component<'t>, Vec<(Pin<'t>, Net<'t>)>)>,
 }
 
 impl<'t> Netlist<'t> {
     pub fn new(sexpr: &'t Value) -> Self {
-        let (title, company, rev) = {
+        let sheet = {
             let title_block = &sexpr["design"]["sheet"]["title_block"];
 
-            (
-                title_block["title"].text_join(),
-                title_block["company"].text_join(),
-                title_block["rev"].text_join(),
-            )
+            Sheet {
+                title: title_block["title"].text_join(),
+                company: title_block["company"].text_join(),
+                rev: title_block["rev"].text_join(),
+            }
         };
 
         let nets = sexpr["nets"]
@@ -83,16 +104,14 @@ impl<'t> Netlist<'t> {
                     .flatten()
                     .collect::<Vec<_>>();
 
-                (v["ref"].text_join(), (component, pins))
+                (
+                    v["ref"].text_join().to_uppercase(),
+                    AssociatedComponent { component, pins },
+                )
             })
             .collect::<HashMap<_, _>>();
 
-        Netlist {
-            company,
-            components,
-            rev,
-            title,
-        }
+        Netlist { sheet, components }
     }
 }
 
@@ -115,6 +134,7 @@ impl<'t> Node<'t> {
 pub enum Net<'t> {
     Custom(Text<'t>),
     Generated(Text<'t>),
+    Label(Text<'t>),
 }
 
 impl<'t> Net<'t> {
@@ -123,6 +143,8 @@ impl<'t> Net<'t> {
 
         if name.starts_with("Net-(") {
             Net::Generated(name)
+        } else if name.starts_with("/") {
+            Net::Label(name)
         } else {
             Net::Custom(name)
         }
@@ -154,8 +176,8 @@ impl<'t> Component<'t> {
 
 #[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct LibraryPart<'t> {
-    lib: Text<'t>,
-    part: Text<'t>,
+    pub lib: Text<'t>,
+    pub part: Text<'t>,
 }
 
 impl<'t> LibraryPart<'t> {
@@ -197,7 +219,7 @@ impl<'t> Pin<'t> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Display)]
 pub enum PinType {
     Input,
     Output,

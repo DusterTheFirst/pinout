@@ -2,6 +2,7 @@
     "cSpell.words": [
         "argh",
         "bidi",
+        "codegen",
         "dialoguer",
         "lexpr",
         "libpart",
@@ -9,6 +10,7 @@
         "libsource",
         "netlist",
         "notconnected",
-        "tstamp"
+        "tstamp",
+        "writedoc"
     ]
 }
