@@ -14,9 +14,11 @@ fn main() -> anyhow::Result<()> {
 
     dbg!(&args);
 
+    eprintln!("Loading netlist {:?}", args.netlist);
+
     let sexpr = {
-        let netlist_file =
-            fs::read_to_string(args.netlist).context("Failed to open the provided netlist file")?;
+        let netlist_file = fs::read_to_string(&args.netlist)
+            .context("Failed to open the provided netlist file")?;
 
         let regex = Regex::new("(  )?\\(tstamp .*?\\)").unwrap();
 
@@ -26,9 +28,15 @@ fn main() -> anyhow::Result<()> {
 
     let netlist = Netlist::new(&sexpr);
 
+    eprintln!(
+        "Found sheet `{}` {} by {}",
+        netlist.title, netlist.rev, netlist.company,
+    );
+
     println!(
-        "Parsing document {} {} by {}",
-        netlist.title, netlist.rev, netlist.company
+        "Generating {} file `{}`",
+        args.language,
+        args.output_file.to_string_lossy(),
     );
 
     Ok(())

@@ -30,10 +30,10 @@ impl FromStr for Language {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().as_str() {
+        Ok(match s.to_lowercase().as_str().trim() {
             "c" => Language::C,
             "cpp" | "cxx" | "c++" => Language::Cpp,
-            "rust" => Language::Rust,
+            "rust" | "rs" => Language::Rust,
             _ => {
                 return Err(format!(
                     "unsupported language, supported languages are: {}",
