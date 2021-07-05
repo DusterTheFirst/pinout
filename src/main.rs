@@ -1,10 +1,9 @@
 use anyhow::Context;
-use args::Language;
 use netlist::Netlist;
 use regex::Regex;
 use std::fs::{self, File};
 
-use crate::{args::Arguments, codegen::generate_c_header};
+use crate::{args::Arguments, codegen::get_generator};
 
 mod args;
 mod codegen;
@@ -13,8 +12,6 @@ mod sexpr;
 
 fn main() -> anyhow::Result<()> {
     let args: Arguments = argh::from_env();
-
-    dbg!(&args);
 
     eprintln!("Loading netlist {:?}", args.netlist);
 
@@ -61,18 +58,9 @@ fn main() -> anyhow::Result<()> {
 
     let mut file = File::create(args.output_file).context("Could not create output file")?;
 
-    match args.language {
-        Language::C | Language::Cpp => {
-            eprintln!("Using C code generator");
+    let generator = get_generator(args.language);
 
-            generate_c_header(&mut file, &sheet, component).context("Failed to create C code")?;
-        }
-        Language::Rust => {
-            eprintln!("Using Rust code generator");
-
-            unimplemented!("No Rust code generator is implemented");
-        }
-    }
+    generator(&mut file, &sheet, component).context("Failed to create code")?;
 
     eprintln!("Done");
 

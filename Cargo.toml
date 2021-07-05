@@ -11,4 +11,4 @@ chrono = "0.4.19"
 indoc = "1.0.3"
 lexpr = "0.2.6"
 regex = "1.5.4"
-strum = { version = "0.21.0", features = ["derive"] }
+strum = { version="0.21.0", features=["derive"] }
