@@ -165,11 +165,27 @@ impl<'t> Component<'t> {
     pub fn new(value: &'t Value) -> Self {
         Self {
             libpart: LibraryPart::new(&value["libsource"]),
-            description: value["libsource"]["description"].text_join(),
+            description: Self::no_whitespace(&value["libsource"]["description"]),
             value: value["value"].text_join(),
-            footprint: value["footprint"].text_join(),
-            datasheet: value["datasheet"].text_join(),
+            footprint: Self::no_whitespace(&value["footprint"]),
+            datasheet: Self::no_whitespace(&value["datasheet"]),
             reference: value["ref"].text_join(),
+        }
+    }
+
+    // FIXME: implement in text join?
+    fn no_whitespace(value: &'t Value) -> Text<'t> {
+        match value {
+            Value::Nil | Value::Null => Cow::Borrowed("~"),
+            v => {
+                let join = v.text_join();
+
+                if join.is_empty() {
+                    Cow::Borrowed("~")
+                } else {
+                    join
+                }
+            }
         }
     }
 }

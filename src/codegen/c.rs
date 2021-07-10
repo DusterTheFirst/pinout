@@ -102,7 +102,15 @@ pub fn generate<'t>(
             /// This is the ADC channel to select the pin PIN_V_BAT_SENSE
             ///
             /// @see PIN_V_SYS
-            static const unsigned int ADC_V_SYS = 2;
+            static const unsigned int ADC_V_SYS = 3;
+
+            /// Raspberry Pi Pico Internal ADC channel
+            ///
+            /// This is the ADC channel to select the internal temperature
+            /// sensor
+            ///
+            /// Before selecting, ensure you have enabled the temperature sensor
+            static const unsigned int ADC_TEMP = 4;
 
             #pragma endregion PICO_BUILTIN
         "
@@ -139,14 +147,14 @@ pub fn generate<'t>(
                     ///
                     /// Pin Name   : {name}
                     /// Pin Number : {num}
-                    /// IO Type    : {ty} {adc}
+                    /// IO Type    : {ty}{adc}
                     /// Net Label  : {net}
                 ",
                 name = pin.name,
                 num = pin.num,
                 ty = pin.ty,
                 adc = match adc_num {
-                    Some(num) => format!("(ADC {})", num),
+                    Some(num) => format!(" (ADC {})", num),
                     None => "".to_string(),
                 },
                 net = net
