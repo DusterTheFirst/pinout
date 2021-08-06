@@ -24,6 +24,7 @@ pub fn generate<'t>(
         w,
         "
             #pragma once
+            #pragma GCC diagnostic ignored \"-Wunknown-pragmas\"
 
             // Generated {date} {time} by pinout
             // - Source: `{title}` {rev}
